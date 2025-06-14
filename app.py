@@ -99,7 +99,7 @@ def get_latest_sensor_values():
     return float(latest_row['MQ136']), float(latest_row['MQ137'])
 
 # === UI ===
-st.markdown("<h1 style='color:#2c3e50;'>🔍 Deteksi Kualitas Daging: YOLOv11 + ViT CNN + IoT Multimodal</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color:#2c3e50;'>🔍 Model Computer Vision Pendeteksi Kualitas Daging  </h1>", unsafe_allow_html=True)
 
 option = st.radio("Pilih metode input:", ["Kamera", "Upload Gambar"])
 
@@ -148,7 +148,7 @@ if img:
             status_text = label_map[status_pred]
 
             # === Output Tabel ===
-            st.markdown("### ✅ Keputusan Akhir")
+            st.markdown("### ✅ Hasil Deteksi")
             st.markdown(
                 f"""
                 <div style='background-color:{label_colors[status_text]};padding:10px;border-radius:8px;'>
