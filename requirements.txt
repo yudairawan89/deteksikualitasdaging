@@ -7,3 +7,4 @@ Pillow
 matplotlib
 requests
 gdown
+joblib
