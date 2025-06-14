@@ -53,7 +53,7 @@ yolo_model, vit_model = load_models()
 # === Load RF Multimodal Model ===
 @st.cache_resource
 def load_rf_multimodal_model():
-    return joblib.load("models/sensor_rf_model.joblib")
+    return joblib.load("sensor_rf_model.joblib")
 
 rf_model = load_rf_multimodal_model()
 
