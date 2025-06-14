@@ -8,3 +8,4 @@ matplotlib
 requests
 gdown
 joblib
+scikit-learn
