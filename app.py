@@ -168,7 +168,7 @@ if st.session_state.image:
                 crop = np_img[y1:y2, x1:x2]
 
                 pred_visual, visual_conf = predict_from_crop(crop)
-                
+
                 # Sensor
                 mq136, mq137 = get_latest_sensor_values()
                 sensor_input = np.array([[mq136, mq137]])
@@ -207,8 +207,6 @@ if st.session_state.image:
 
 ---
 ### **🔄 Tombol Reset**
-
-To clear the photo and refresh the entire page, we reset all the session state variables that hold information about the current image and its processing results. Then, `st.rerun()` forces Streamlit to re-execute the script from the beginning.
 
 ```python
 if st.button("🔄 Clear Foto"):
