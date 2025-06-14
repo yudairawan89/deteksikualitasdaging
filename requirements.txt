@@ -2,9 +2,11 @@ streamlit>=1.25
 torch>=2.0.0
 torchvision>=0.15
 ultralytics>=8.0.20
-opencv-python-headless>=4.7.0
+opencv-python-headless>=4.8.0.74
 Pillow
 matplotlib
 requests
 gdown
 joblib>=1.2
+pandas
+scikit-learn
