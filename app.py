@@ -14,6 +14,12 @@ from ultralytics import YOLO
 from torchvision import models
 import torch.nn as nn
 
+# === Inisialisasi Session State ===
+if "processed" not in st.session_state:
+    st.session_state.processed = False
+if "image" not in st.session_state:
+    st.session_state.image = None
+
 # === Konfigurasi ===
 os.makedirs("models", exist_ok=True)
 vit_path = "models/vit_cnn_daging.pt"
@@ -97,12 +103,18 @@ option = st.radio("Pilih metode input:", ["Kamera", "Upload Gambar"])
 img = None
 if option == "Kamera":
     img_file = st.camera_input("Ambil Gambar Daging")
-    if img_file:
-        img = Image.open(img_file)
+    if img_file and not st.session_state.processed:
+        st.session_state.image = Image.open(img_file)
+        st.session_state.processed = True
+    elif st.session_state.processed:
+        img = st.session_state.image
 elif option == "Upload Gambar":
     img_file = st.file_uploader("Upload gambar daging", type=["jpg", "jpeg", "png"])
     if img_file:
         img = Image.open(img_file)
+
+if st.session_state.image and option == "Kamera":
+    img = st.session_state.image
 
 if img:
     st.image(img, caption="Gambar Input", use_column_width=True)
@@ -142,3 +154,10 @@ if img:
             }]))
 
             st.image(crop, caption=f"Prediksi Visual: *{pred_visual}* (Conf: {visual_conf:.2f})", width=300)
+
+# === Tombol Reset untuk Kamera ===
+if option == "Kamera":
+    if st.button("🔄 Reset Kamera"):
+        st.session_state.processed = False
+        st.session_state.image = None
+        st.rerun()
