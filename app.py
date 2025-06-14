@@ -19,6 +19,11 @@ if "processed" not in st.session_state:
     st.session_state.processed = False
 if "image" not in st.session_state:
     st.session_state.image = None
+if "detection_results" not in st.session_state: # Add new session state for results
+    st.session_state.detection_results = None
+if "uploaded_file" not in st.session_state: # To handle uploaded file state
+    st.session_state.uploaded_file = None
+
 
 # === Konfigurasi ===
 os.makedirs("models", exist_ok=True)
@@ -98,8 +103,8 @@ def get_latest_sensor_values():
     latest_row = df.iloc[-1]
     return float(latest_row['MQ136']), float(latest_row['MQ137'])
 
-# === UI ===
-st.markdown("<h1 style='color:#2c3e50;'>🔍 Pendeteksi Kualitas Daging  </h1>", unsafe_allow_html=True)
+# --- UI ---
+st.markdown("<h1 style='color:#2c3e50;'>🔍 Pendeteksi Kualitas Daging </h1>", unsafe_allow_html=True)
 
 option = st.radio("Pilih metode input:", ["Kamera", "Upload Gambar"])
 
@@ -109,63 +114,82 @@ if option == "Kamera":
     if img_file and not st.session_state.processed:
         st.session_state.image = Image.open(img_file)
         st.session_state.processed = True
+        st.session_state.detection_results = None # Clear previous results
     elif st.session_state.processed:
         img = st.session_state.image
 elif option == "Upload Gambar":
     img_file = st.file_uploader("Upload gambar daging", type=["jpg", "jpeg", "png"])
     if img_file:
-        img = Image.open(img_file)
+        # Check if a new file is uploaded or the same file is re-uploaded
+        if st.session_state.uploaded_file != img_file.name:
+            st.session_state.uploaded_file = img_file.name # Store file name
+            st.session_state.image = Image.open(img_file)
+            st.session_state.processed = True
+            st.session_state.detection_results = None # Clear previous results
+        img = st.session_state.image # Always display the current image
 
-if st.session_state.image and option == "Kamera":
+if st.session_state.image:
     img = st.session_state.image
-
-if img:
     st.image(img, caption="📷 Gambar Input", use_column_width=True)
-    tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-    img.save(tfile.name)
 
-    results = yolo_model(tfile.name)
-    boxes = results[0].boxes
+    # Process image only if results haven't been processed yet for the current image
+    if st.session_state.detection_results is None:
+        tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        img.save(tfile.name)
 
-    if not boxes:
+        results = yolo_model(tfile.name)
+        boxes = results[0].boxes
+
+        if not boxes:
+            st.session_state.detection_results = "no_meat_found"
+        else:
+            # Store results in session state to avoid re-running predictions on rerun
+            st.session_state.detection_results = []
+            for box in boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                np_img = np.array(img)
+                crop = np_img[y1:y2, x1:x2]
+
+                pred_visual, visual_conf = predict_from_crop(crop)
+                
+                mq136, mq137 = get_latest_sensor_values()
+                sensor_input = np.array([[mq136, mq137]])
+                sensor_scaled = rf_scaler.transform(sensor_input)
+                status_pred = rf_model.predict(sensor_scaled)[0]
+                status_text = label_map[status_pred]
+
+                st.session_state.detection_results.append({
+                    "crop_image": crop,
+                    "pred_visual": pred_visual,
+                    "visual_conf": visual_conf,
+                    "mq136": mq136,
+                    "mq137": mq137,
+                    "status_text": status_text
+                })
+        os.unlink(tfile.name) # Clean up temp file
+
+    # Display results from session state
+    if st.session_state.detection_results == "no_meat_found":
         st.warning("Tidak ditemukan objek daging oleh YOLO.")
-    else:
-        for box in boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            conf = float(box.conf[0])
-            np_img = np.array(img)
-            crop = np_img[y1:y2, x1:x2]
-
-            # Prediksi visual
-            pred_visual, visual_conf = predict_from_crop(crop)
-            visual_encoded = encode_visual(pred_visual)
-
-            # Sensor
-            mq136, mq137 = get_latest_sensor_values()
-            sensor_input = np.array([[mq136, mq137]])
-            sensor_scaled = rf_scaler.transform(sensor_input)
-            status_pred = rf_model.predict(sensor_scaled)[0]
-            status_text = label_map[status_pred]
-
-            # === Output Tabel ===
+    elif st.session_state.detection_results:
+        for result in st.session_state.detection_results:
             st.markdown("### ✅ Hasil Deteksi")
             st.markdown(
                 f"""
-                <div style='background-color:{label_colors[status_text]};padding:10px;border-radius:8px;'>
-                    <b>Visual:</b> {pred_visual} |
-                    <b>H₂S (MQ136):</b> {mq136:.4f} |
-                    <b>NH₃ (MQ137):</b> {mq137:.4f} |
-                    <b>Status Akhir:</b> {status_text}
+                <div style='background-color:{label_colors[result['status_text']]};padding:10px;border-radius:8px;'>
+                    <b>Visual:</b> {result['pred_visual']} |
+                    <b>H₂S (MQ136):</b> {result['mq136']:.4f} |
+                    <b>NH₃ (MQ137):</b> {result['mq137']:.4f} |
+                    <b>Status Akhir:</b> {result['status_text']}
                 </div>
                 """, unsafe_allow_html=True
             )
+            st.image(result['crop_image'], caption=f"🧠 Prediksi Visual: *{result['pred_visual']}* (Conf: {result['visual_conf']:.2f})", width=300)
 
-            # === Gambar hasil klasifikasi ===
-            st.image(crop, caption=f"🧠 Prediksi Visual: *{pred_visual}* (Conf: {visual_conf:.2f})", width=300)
-
-# === Tombol Reset ===
-if option == "Kamera":
-    if st.button("🔄 Reset Kamera"):
-        st.session_state.processed = False
-        st.session_state.image = None
-        st.rerun()
+# --- Tombol Reset ---
+if st.button("🔄 Clear Foto"):
+    st.session_state.processed = False
+    st.session_state.image = None
+    st.session_state.detection_results = None
+    st.session_state.uploaded_file = None # Reset uploaded file state
+    st.rerun()
