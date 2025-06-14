@@ -14,7 +14,7 @@ from io import BytesIO
 # === Konfigurasi Folder Model ===
 os.makedirs("models", exist_ok=True)
 vit_path = "models/vit_cnn_daging.pt"
-vit_gdrive_url = "https://drive.google.com/uc?id=160wq-WOQz1sc76bKO5qZ38k49ILGZkJT"
+vit_gdrive_url = "https://drive.google.com/uc?id=1zdTPq9sN3DmSkkRBnRqSD_SCfq-sOTvu"
 
 # === Unduh Model dari GDrive jika belum ada ===
 def download_file_from_gdrive():
