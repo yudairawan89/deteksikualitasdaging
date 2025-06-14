@@ -145,11 +145,11 @@ if img:
             status_text = label_map[status_pred]
 
             # Output
-            st.markdown("### Keputusan Akhir")
+            st.markdown("### Hasil Deteksi")
             st.table(pd.DataFrame([{
                 "Visual": pred_visual,
-                "MQ136": round(mq136, 4),
-                "MQ137": round(mq137, 4),
+                "Gas Hidrogen Sulfida (H₂S) - MQ136": round(mq136, 4),
+                "Gas Amonia (NH₃) - MQ137": round(mq137, 4),
                 "Status Akhir": status_text
             }]))
 
