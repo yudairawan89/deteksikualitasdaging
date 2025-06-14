@@ -30,7 +30,7 @@ download_file_from_gdrive()
 # === Load Models ===
 @st.cache_resource
 def load_models():
-    yolo_model = YOLO("models/yolov11_daging.pt")  # asumsi file kecil dan disimpan manual
+    yolo_model = YOLO("models/best.torchscript")  # asumsi file kecil dan disimpan manual
     vit_model = models.vit_b_16(weights=None)
     vit_model.heads = nn.Sequential(
         nn.Linear(vit_model.heads.head.in_features, 128),
