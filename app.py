@@ -14,7 +14,7 @@ from ultralytics import YOLO
 from torchvision import models
 import torch.nn as nn
 
-# --- Inisialisasi Session State ---
+# --- Initialize Session State ---
 # 'processed': True if an image has been processed (either from camera or upload)
 if "processed" not in st.session_state:
     st.session_state.processed = False
@@ -32,13 +32,13 @@ if "selected_option" not in st.session_state:
     st.session_state.selected_option = "Kamera"
 
 
-# --- Konfigurasi ---
+# --- Configuration ---
 os.makedirs("models", exist_ok=True)
 vit_path = "models/vit_cnn_daging.pt"
 vit_gdrive_id = "1zdTPq9sN3DmSkkRBnRqSD_SCfq-sOTvu"
 vit_gdrive_url = f"https://drive.google.com/uc?id={vit_gdrive_id}"
 
-# --- Download model ViT jika belum ada ---
+# --- Download ViT model if not exists ---
 def download_vit_model():
     if not os.path.exists(vit_path):
         with st.spinner("Mengunduh model ViT dari Google Drive..."):
@@ -47,7 +47,7 @@ def download_vit_model():
 
 download_vit_model()
 
-# --- Fungsi Rekonstruksi ViT ---
+# --- Reconstruct ViT model ---
 def rebuild_vit_model():
     model = models.vit_b_16(weights=None)
     model.heads = nn.Sequential(
@@ -77,7 +77,7 @@ def load_rf_model_and_scaler():
 
 rf_model, rf_scaler = load_rf_model_and_scaler()
 
-# --- Label dan Transformasi ---
+# --- Labels and Transformations ---
 class_names = ['Busuk', 'Sedang', 'Segar']
 label_map = {0: "Layak Konsumsi", 1: "Perlu Diperiksa", 2: "Tidak Layak"}
 label_colors = {
@@ -107,7 +107,7 @@ def get_latest_sensor_values():
     latest_row = df.iloc[-1]
     return float(latest_row['MQ136']), float(latest_row['MQ137'])
 
-# --- UI ---
+# --- UI Layout ---
 st.markdown("<h1 style='color:#2c3e50;'>🔍 Pendeteksi Kualitas Daging </h1>", unsafe_allow_html=True)
 
 # Use `st.session_state.selected_option` to keep track of the radio button choice
@@ -205,10 +205,10 @@ if st.session_state.image:
             )
             st.image(result['crop_image'], caption=f"🧠 Prediksi Visual: *{result['pred_visual']}* (Conf: {result['visual_conf']:.2f})", width=300)
 
----
-### **🔄 Tombol Reset**
+# --- Reset Button ---
+st.markdown("---") # Horizontal line for separation
+st.markdown("### 🔄 Tombol Reset")
 
-```python
 if st.button("🔄 Clear Foto"):
     # Reset all relevant session state variables to their initial values
     st.session_state.processed = False
