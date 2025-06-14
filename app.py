@@ -69,7 +69,7 @@ def predict_from_crop(crop_img):
 
 # === Streamlit UI ===
 
-st.title("🥩 Deteksi Kualitas Daging: YOLOv11 + ViT CNN")
+st.title("🥩 Deteksi Kualitas Daging: Pengembangan YOLOv11-ADAM-ViT CNN (Diffusion Model-IoT Multimodal Fusion")
 
 option = st.radio("Pilih metode input:", ["📸 Kamera", "📁 Upload Gambar"])
 
