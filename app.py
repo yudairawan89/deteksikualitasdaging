@@ -3,39 +3,43 @@ import torch
 import torchvision.transforms as transforms
 import numpy as np
 import tempfile
-import requests
 import os
+import gdown
 from PIL import Image
 from ultralytics import YOLO
 from torchvision import models
 import torch.nn as nn
-from io import BytesIO
 
-# === Konfigurasi Folder Model ===
+# === Konfigurasi ===
 os.makedirs("models", exist_ok=True)
 vit_path = "models/vit_cnn_daging.pt"
-vit_gdrive_url = "https://drive.google.com/uc?id=1zdTPq9sN3DmSkkRBnRqSD_SCfq-sOTvu"
+vit_gdrive_id = "1zdTPq9sN3DmSkkRBnRqSD_SCfq-sOTvu"
+vit_gdrive_url = f"https://drive.google.com/uc?id={vit_gdrive_id}"
 
-# === Unduh Model dari GDrive jika belum ada ===
-def download_file_from_gdrive():
+# === Download model ViT jika belum ada ===
+def download_vit_model():
     if not os.path.exists(vit_path):
-        with st.spinner("⏳ Downloading ViT model from Google Drive..."):
-            r = requests.get(vit_gdrive_url, allow_redirects=True)
-            open(vit_path, 'wb').write(r.content)
-            st.success("✅ ViT model downloaded.")
+        with st.spinner("⏳ Mengunduh model ViT dari Google Drive..."):
+            gdown.download(vit_gdrive_url, vit_path, quiet=False)
+            st.success("✅ Model ViT berhasil diunduh!")
 
-download_file_from_gdrive()
+download_vit_model()
+
+# === Fungsi Rekonstruksi ViT ===
+def rebuild_vit_model():
+    model = models.vit_b_16(weights=None)
+    model.heads = nn.Sequential(
+        nn.Linear(model.heads.head.in_features, 128),
+        nn.ReLU(),
+        nn.Linear(128, 3)
+    )
+    return model
 
 # === Load Models ===
 @st.cache_resource
 def load_models():
-    yolo_model = YOLO("yolov11_daging.pt")  # asumsi file kecil dan disimpan manual
-    vit_model = models.vit_b_16(weights=None)
-    vit_model.heads = nn.Sequential(
-        nn.Linear(vit_model.heads.head.in_features, 128),
-        nn.ReLU(),
-        nn.Linear(128, 3)
-    )
+    yolo_model = YOLO("yolov11_daging.pt")  # file harus sudah ada di folder
+    vit_model = rebuild_vit_model()
     vit_model.load_state_dict(torch.load(vit_path, map_location="cpu"))
     vit_model.eval()
     return yolo_model, vit_model
@@ -81,7 +85,7 @@ if img:
     st.image(img, caption="🖼️ Gambar Input", use_column_width=True)
 
     # Simpan sementara
-    tfile = tempfile.NamedTemporaryFile(delete=False)
+    tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
     img.save(tfile.name)
 
     # === YOLO Detection ===
@@ -91,13 +95,9 @@ if img:
     st.subheader("📍 Deteksi dan Klasifikasi")
     for box in boxes:
         x1, y1, x2, y2 = map(int, box.xyxy[0])
-        cls_id = int(box.cls[0])
         conf = float(box.conf[0])
-
         np_img = np.array(img)
         crop = np_img[y1:y2, x1:x2]
-
         pred = predict_from_crop(crop)
 
         st.image(crop, caption=f"Prediksi: **{pred}** (Conf: {conf:.2f})", width=300)
-
