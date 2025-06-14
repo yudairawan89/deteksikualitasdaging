@@ -23,9 +23,9 @@ vit_gdrive_url = f"https://drive.google.com/uc?id={vit_gdrive_id}"
 # === Download model ViT jika belum ada ===
 def download_vit_model():
     if not os.path.exists(vit_path):
-        with st.spinner("\u23f3 Mengunduh model ViT dari Google Drive..."):
+        with st.spinner("Mengunduh model ViT dari Google Drive..."):
             gdown.download(vit_gdrive_url, vit_path, quiet=False)
-            st.success("\u2705 Model ViT berhasil diunduh!")
+            st.success("Model ViT berhasil diunduh!")
 
 download_vit_model()
 
@@ -78,9 +78,9 @@ def predict_from_crop(crop_img):
     tensor = transform(image).unsqueeze(0)
     with torch.no_grad():
         outputs = vit_model(tensor)
-        pred = torch.argmax(outputs, 1).item()
-        conf = torch.nn.functional.softmax(outputs, dim=1)[0][pred].item()
-    return class_names[pred], conf
+        pred_class = torch.argmax(outputs, 1).item()
+        confidence = torch.softmax(outputs, dim=1)[0, pred_class].item()
+    return class_names[pred_class], confidence
 
 # === Ambil data sensor dari Google Sheets ===
 def get_latest_sensor_values():
@@ -90,59 +90,55 @@ def get_latest_sensor_values():
     return float(latest_row['MQ136']), float(latest_row['MQ137'])
 
 # === UI Streamlit ===
-st.title("\ud83e\udd69 Deteksi Kualitas Daging: YOLOv11 + ViT CNN + IoT Multimodal")
+st.title("Deteksi Kualitas Daging: YOLOv11 + ViT CNN + IoT Multimodal")
 
-option = st.radio("Pilih metode input:", ["\ud83d\udcf8 Kamera", "\ud83d\udcc1 Upload Gambar"])
+option = st.radio("Pilih metode input:", ["Kamera", "Upload Gambar"])
 
 img = None
-if option == "\ud83d\udcf8 Kamera":
-    if "camera_img" not in st.session_state:
-        st.session_state["camera_img"] = None
-
+if option == "Kamera":
     img_file = st.camera_input("Ambil Gambar Daging")
-    if img_file and img_file != st.session_state["camera_img"]:
-        st.session_state["camera_img"] = img_file
-        st.rerun()
-
-    if st.session_state["camera_img"]:
-        img = Image.open(st.session_state["camera_img"])
-
-elif option == "\ud83d\udcc1 Upload Gambar":
+    if img_file:
+        img = Image.open(img_file)
+elif option == "Upload Gambar":
     img_file = st.file_uploader("Upload gambar daging", type=["jpg", "jpeg", "png"])
     if img_file:
         img = Image.open(img_file)
 
 if img:
-    st.image(img, caption="\ud83d\udcf8 Gambar Input", use_column_width=True)
-
+    st.image(img, caption="Gambar Input", use_column_width=True)
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
     img.save(tfile.name)
 
     results = yolo_model(tfile.name)
     boxes = results[0].boxes
 
-    st.subheader("\ud83d\udccd Deteksi dan Klasifikasi")
-    for box in boxes:
-        x1, y1, x2, y2 = map(int, box.xyxy[0])
-        conf = float(box.conf[0])
-        np_img = np.array(img)
-        crop = np_img[y1:y2, x1:x2]
+    if not boxes:
+        st.warning("Tidak ditemukan objek daging oleh YOLO.")
+    else:
+        for box in boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            conf = float(box.conf[0])
+            np_img = np.array(img)
+            crop = np_img[y1:y2, x1:x2]
 
-        pred_visual, visual_conf = predict_from_crop(crop)
-        visual_encoded = encode_visual(pred_visual)
+            # Prediksi visual
+            pred_visual, visual_conf = predict_from_crop(crop)
+            visual_encoded = encode_visual(pred_visual)
 
-        mq136, mq137 = get_latest_sensor_values()
-        sensor_input = np.array([[mq136, mq137]])
-        sensor_scaled = rf_scaler.transform(sensor_input)
+            # Ambil sensor
+            mq136, mq137 = get_latest_sensor_values()
+            sensor_input = np.array([[mq136, mq137]])
+            sensor_scaled = rf_scaler.transform(sensor_input)
+            status_pred = rf_model.predict(sensor_scaled)[0]
+            status_text = label_map[status_pred]
 
-        status_pred = rf_model.predict(sensor_scaled)[0]
-        status_text = label_map[status_pred]
+            # Output
+            st.markdown("### Keputusan Akhir")
+            st.table(pd.DataFrame([{
+                "Visual": pred_visual,
+                "MQ136": round(mq136, 4),
+                "MQ137": round(mq137, 4),
+                "Status Akhir": status_text
+            }]))
 
-        st.image(crop, caption=f"Prediksi Visual: *{pred_visual}* (Conf: {visual_conf:.2f})", width=300)
-        st.markdown("### \u2705 Keputusan Akhir")
-        st.table({
-            "Visual": [pred_visual],
-            "MQ136": [mq136],
-            "MQ137": [mq137],
-            "Status Akhir": [status_text]
-        })
+            st.image(crop, caption=f"Prediksi Visual: *{pred_visual}* (Conf: {visual_conf:.2f})", width=300)
