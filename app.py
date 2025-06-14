@@ -42,7 +42,7 @@ def rebuild_vit_model():
 # === Load Models ===
 @st.cache_resource
 def load_models():
-    yolo_model = YOLO("yolov11_daging.pt")  # file harus sudah ada di folder
+    yolo_model = YOLO("yolov11_daging.pt")
     vit_model = rebuild_vit_model()
     vit_model.load_state_dict(torch.load(vit_path, map_location="cpu"))
     vit_model.eval()
@@ -50,12 +50,14 @@ def load_models():
 
 yolo_model, vit_model = load_models()
 
-# === Load RF Multimodal Model ===
+# === Load RF Model & Scaler ===
 @st.cache_resource
-def load_rf_multimodal_model():
-    return joblib.load("sensor_rf_model.joblib")
+def load_rf_model_and_scaler():
+    rf_model = joblib.load("sensor_rf_model.joblib")
+    scaler = joblib.load("sensor_rf_scaler.joblib")
+    return rf_model, scaler
 
-rf_model = load_rf_multimodal_model()
+rf_model, rf_scaler = load_rf_model_and_scaler()
 
 # === Label dan Transformasi ===
 class_names = ['Busuk', 'Sedang', 'Segar']
@@ -87,7 +89,7 @@ def get_latest_sensor_values():
     return float(latest_row['MQ136']), float(latest_row['MQ137'])
 
 # === UI Streamlit ===
-st.title("🥩 Deteksi Kualitas Daging: YOLOv11-ViT CNN + IoT Multimodal Sensor Fusion")
+st.title("🥩 Deteksi Kualitas Daging: YOLOv11 + ViT CNN + IoT Multimodal")
 
 option = st.radio("Pilih metode input:", ["📸 Kamera", "📁 Upload Gambar"])
 
@@ -104,11 +106,9 @@ elif option == "📁 Upload Gambar":
 if img:
     st.image(img, caption="🖼️ Gambar Input", use_column_width=True)
 
-    # Simpan sementara
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
     img.save(tfile.name)
 
-    # === YOLO Detection ===
     results = yolo_model(tfile.name)
     boxes = results[0].boxes
 
@@ -118,18 +118,21 @@ if img:
         conf = float(box.conf[0])
         np_img = np.array(img)
         crop = np_img[y1:y2, x1:x2]
+
+        # Prediksi visual dari ViT
         pred_visual = predict_from_crop(crop)
         visual_encoded = encode_visual(pred_visual)
 
-        # Ambil sensor dari Google Sheet
+        # Ambil nilai sensor
         mq136, mq137 = get_latest_sensor_values()
+        sensor_input = np.array([[mq136, mq137]])
+        sensor_scaled = rf_scaler.transform(sensor_input)
 
-        # Prediksi akhir berdasarkan visual + sensor
-        multimodal_input = pd.DataFrame([[visual_encoded, mq136, mq137]], columns=["Visual", "MQ136", "MQ137"])
-        status_pred = rf_model.predict(multimodal_input)[0]
+        # Prediksi status akhir
+        status_pred = rf_model.predict(sensor_scaled)[0]
         status_text = label_map[status_pred]
 
-        # Tampilkan hasil
+        # Output
         st.image(crop, caption=f"Prediksi Visual: **{pred_visual}** (Conf: {conf:.2f})", width=300)
         st.markdown("### ✅ Keputusan Akhir")
         st.table({
