@@ -99,7 +99,7 @@ def get_latest_sensor_values():
     return float(latest_row['MQ136']), float(latest_row['MQ137'])
 
 # === UI ===
-st.markdown("<h1 style='color:#2c3e50;'>🔍 Model Computer Vision Pendeteksi Kualitas Daging  </h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color:#2c3e50;'>🔍 Pendeteksi Kualitas Daging  </h1>", unsafe_allow_html=True)
 
 option = st.radio("Pilih metode input:", ["Kamera", "Upload Gambar"])
 
