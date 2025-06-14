@@ -1,30 +1,50 @@
-# app.py
 import streamlit as st
 import torch
-from PIL import Image
+import torchvision.transforms as transforms
 import numpy as np
+import tempfile
+import requests
+import os
 import cv2
+from PIL import Image
 from ultralytics import YOLO
-from torchvision import transforms, models
+from torchvision import models
+import torch.nn as nn
+from io import BytesIO
+
+# === Konfigurasi Folder Model ===
+os.makedirs("models", exist_ok=True)
+vit_path = "models/vit_cnn_daging.pt"
+vit_gdrive_url = "https://drive.google.com/uc?id=160wq-WOQz1sc76bKO5qZ38k49ILGZkJT"
+
+# === Unduh Model dari GDrive jika belum ada ===
+def download_file_from_gdrive():
+    if not os.path.exists(vit_path):
+        with st.spinner("⏳ Downloading ViT model from Google Drive..."):
+            r = requests.get(vit_gdrive_url, allow_redirects=True)
+            open(vit_path, 'wb').write(r.content)
+            st.success("✅ ViT model downloaded.")
+
+download_file_from_gdrive()
 
 # === Load Models ===
 @st.cache_resource
 def load_models():
-    yolo_model = YOLO("yolov11_daging.pt")
+    yolo_model = YOLO("models/yolov11_daging.pt")  # asumsi file kecil dan disimpan manual
     vit_model = models.vit_b_16(weights=None)
-    vit_model.heads = torch.nn.Sequential(
-        torch.nn.Linear(vit_model.heads.head.in_features, 128),
-        torch.nn.ReLU(),
-        torch.nn.Linear(128, 3)  # Busuk, Sedang, Segar
+    vit_model.heads = nn.Sequential(
+        nn.Linear(vit_model.heads.head.in_features, 128),
+        nn.ReLU(),
+        nn.Linear(128, 3)
     )
-    vit_model.load_state_dict(torch.load("vit_cnn_daging.pt", map_location="cpu"))
+    vit_model.load_state_dict(torch.load(vit_path, map_location="cpu"))
     vit_model.eval()
     return yolo_model, vit_model
 
 yolo_model, vit_model = load_models()
 
-# === Kelas ===
-class_names = ["Busuk", "Sedang", "Segar"]
+# === Kelas Label ===
+class_names = ['Busuk', 'Sedang', 'Segar']
 
 # === Transformasi untuk ViT ===
 transform = transforms.Compose([
@@ -33,52 +53,52 @@ transform = transforms.Compose([
     transforms.Normalize([0.5], [0.5])
 ])
 
-# === Fungsi Klasifikasi Crop ===
-def classify_crop(image_pil):
-    input_tensor = transform(image_pil).unsqueeze(0)
+# === Prediksi dari Crop Bounding Box ===
+def predict_from_crop(crop_img):
+    image = Image.fromarray(crop_img)
+    tensor = transform(image).unsqueeze(0)
     with torch.no_grad():
-        output = vit_model(input_tensor)
-        pred = torch.argmax(output, 1).item()
+        outputs = vit_model(tensor)
+        pred = torch.argmax(outputs, 1).item()
     return class_names[pred]
 
-# === Fungsi Deteksi & Crop dengan YOLO ===
-def detect_and_crop(image):
-    results = yolo_model(image)
-    crops = []
-    for r in results:
-        for box in r.boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            crop = image[y1:y2, x1:x2]
-            crops.append((crop, (x1, y1, x2, y2)))
-    return crops
+# === Streamlit UI ===
+st.set_page_config(page_title="Deteksi Kesegaran Daging", layout="wide")
+st.title("🥩 Deteksi Kualitas Daging: YOLOv11 + ViT CNN")
 
-# === UI Streamlit ===
-st.title("Deteksi Kesegaran Daging - YOLO + ViT")
+option = st.radio("Pilih metode input:", ["📸 Kamera", "📁 Upload Gambar"])
 
-uploaded = st.file_uploader("Upload Gambar Daging", type=["jpg", "jpeg", "png"])
-use_camera = st.checkbox("Gunakan Kamera")
+img = None
+if option == "📸 Kamera":
+    img_file = st.camera_input("Ambil Gambar Daging")
+    if img_file:
+        img = Image.open(img_file)
+elif option == "📁 Upload Gambar":
+    img_file = st.file_uploader("Upload gambar daging", type=["jpg", "jpeg", "png"])
+    if img_file:
+        img = Image.open(img_file)
 
-if uploaded or use_camera:
-    if uploaded:
-        file_bytes = np.asarray(bytearray(uploaded.read()), dtype=np.uint8)
-        image = cv2.imdecode(file_bytes, 1)
-    elif use_camera:
-        image = st.camera_input("Ambil Foto Daging")
-        if image is not None:
-            image = Image.open(image)
-            image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        else:
-            st.stop()
+if img:
+    st.image(img, caption="🖼️ Gambar Input", use_column_width=True)
 
-    st.image(image, caption="Gambar Masukan", use_column_width=True)
+    # Simpan sementara
+    tfile = tempfile.NamedTemporaryFile(delete=False)
+    img.save(tfile.name)
 
-    # Proses YOLO
-    st.subheader("Hasil Deteksi dan Klasifikasi")
-    crops = detect_and_crop(image)
+    # === YOLO Detection ===
+    results = yolo_model(tfile.name)
+    boxes = results[0].boxes
 
-    for idx, (crop, (x1, y1, x2, y2)) in enumerate(crops):
-        crop_pil = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
-        pred_label = classify_crop(crop_pil)
-        st.image(crop_pil, caption=f"Region {idx+1} - {pred_label}", width=300)
-else:
-    st.info("Silakan upload gambar atau gunakan kamera.")
+    st.subheader("📍 Deteksi dan Klasifikasi")
+    for box in boxes:
+        x1, y1, x2, y2 = map(int, box.xyxy[0])
+        cls_id = int(box.cls[0])
+        conf = float(box.conf[0])
+
+        np_img = np.array(img)
+        crop = np_img[y1:y2, x1:x2]
+
+        pred = predict_from_crop(crop)
+
+        st.image(crop, caption=f"Prediksi: **{pred}** (Conf: {conf:.2f})", width=300)
+
