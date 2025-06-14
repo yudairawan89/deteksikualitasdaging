@@ -2,10 +2,8 @@ streamlit
 torch
 torchvision
 ultralytics
-gdown
-joblib
-opencv-python
-numpy
+opencv-python-headless
 Pillow
-scikit-learn
-pandas
+matplotlib
+requests
+gdown
