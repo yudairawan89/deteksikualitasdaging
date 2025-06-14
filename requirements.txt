@@ -2,5 +2,7 @@ streamlit
 torch
 torchvision
 ultralytics
-opencv-python-headless
+opencv-python
 Pillow
+matplotlib
+requests
