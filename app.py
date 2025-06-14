@@ -1,6 +1,4 @@
 import streamlit as st
-st.set_page_config(page_title="Deteksi Kesegaran Daging", layout="wide")
-
 import torch
 import torchvision.transforms as transforms
 import numpy as np
@@ -13,21 +11,13 @@ from PIL import Image
 from ultralytics import YOLO
 from torchvision import models
 import torch.nn as nn
+from streamlit.runtime.scriptrunner import rerun  # ✅ untuk reset total
 
-# === Inisialisasi Session State ===
+# === Session State Inisialisasi ===
 if "processed" not in st.session_state:
     st.session_state.processed = False
 if "image" not in st.session_state:
     st.session_state.image = None
-if "clear" not in st.session_state:
-    st.session_state.clear = False
-
-# === Reset State jika tombol Clear ditekan ===
-if st.session_state.clear:
-    st.session_state.image = None
-    st.session_state.processed = False
-    st.session_state.clear = False
-    st.experimental_rerun()
 
 # === Konfigurasi Model ===
 os.makedirs("models", exist_ok=True)
@@ -60,17 +50,16 @@ def load_models():
     vit_model.eval()
     return yolo_model, vit_model
 
-yolo_model, vit_model = load_models()
-
 @st.cache_resource
 def load_rf_model_and_scaler():
     rf_model = joblib.load("sensor_rf_model.joblib")
     scaler = joblib.load("sensor_rf_scaler.joblib")
     return rf_model, scaler
 
+yolo_model, vit_model = load_models()
 rf_model, rf_scaler = load_rf_model_and_scaler()
 
-# === Label dan Transformasi ===
+# === Label dan Warna ===
 class_names = ['Busuk', 'Sedang', 'Segar']
 label_map = {0: "Layak Konsumsi", 1: "Perlu Diperiksa", 2: "Tidak Layak"}
 label_colors = {
@@ -103,7 +92,7 @@ def get_latest_sensor_values():
     latest_row = df.iloc[-1]
     return float(latest_row['MQ136']), float(latest_row['MQ137'])
 
-# === UI Streamlit ===
+# === Tampilan Utama ===
 st.markdown("<h1 style='color:#2c3e50;'>🔍 Pendeteksi Kualitas Daging</h1>", unsafe_allow_html=True)
 
 option = st.radio("Pilih metode input:", ["Kamera", "Upload Gambar"])
@@ -141,18 +130,15 @@ if img:
             np_img = np.array(img)
             crop = np_img[y1:y2, x1:x2]
 
-            # Prediksi Visual
             pred_visual, visual_conf = predict_from_crop(crop)
             visual_encoded = encode_visual(pred_visual)
 
-            # Sensor
             mq136, mq137 = get_latest_sensor_values()
             sensor_input = np.array([[mq136, mq137]])
             sensor_scaled = rf_scaler.transform(sensor_input)
             status_pred = rf_model.predict(sensor_scaled)[0]
             status_text = label_map[status_pred]
 
-            # Output
             st.markdown("### ✅ Hasil Deteksi")
             st.markdown(
                 f"""
@@ -167,6 +153,9 @@ if img:
 
             st.image(crop, caption=f"🧠 Prediksi Visual: *{pred_visual}* (Conf: {visual_conf:.2f})", width=300)
 
-# === Tombol Clear / Reset ===
-if st.button("🗑️ Clear Foto dan Deteksi"):
-    st.session_state.clear = True
+# === Tombol Clear / Reset Kamera ===
+if option == "Kamera":
+    if st.button("🗑️ Clear Foto dan Deteksi"):
+        st.session_state.processed = False
+        st.session_state.image = None
+        rerun()
