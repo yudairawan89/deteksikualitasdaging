@@ -5,7 +5,6 @@ import numpy as np
 import tempfile
 import requests
 import os
-import cv2
 from PIL import Image
 from ultralytics import YOLO
 from torchvision import models
