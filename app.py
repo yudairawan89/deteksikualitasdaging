@@ -165,5 +165,5 @@ if option == "Kamera":
     if st.button("🔄 Clear Foto dan Reset Deteksi"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
-        st.experimental_set_query_params(reset="1")
-        st.stop()
+        st.query_params.clear()
+        st.rerun()
