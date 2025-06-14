@@ -1,4 +1,6 @@
 import streamlit as st
+st.set_page_config(page_title="Deteksi Kesegaran Daging", layout="wide")
+
 import torch
 import torchvision.transforms as transforms
 import numpy as np
@@ -66,7 +68,7 @@ def predict_from_crop(crop_img):
     return class_names[pred]
 
 # === Streamlit UI ===
-st.set_page_config(page_title="Deteksi Kesegaran Daging", layout="wide")
+
 st.title("🥩 Deteksi Kualitas Daging: YOLOv11 + ViT CNN")
 
 option = st.radio("Pilih metode input:", ["📸 Kamera", "📁 Upload Gambar"])
