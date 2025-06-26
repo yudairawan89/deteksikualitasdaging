@@ -93,10 +93,14 @@ def predict_from_crop(crop_img):
     return class_names[pred_class], confidence
 
 def get_latest_sensor_values():
-    url = "https://docs.google.com/spreadsheets/d/1Qs058JpuvYJSBhH16tp7zWabTad6zZSOhleSBIkobpM/export?format=csv"
+    url = "https://docs.google.com/spreadsheets/d/1-tu0FIM-rFuhu1vtiyLqvivDc6V5M5R-ri_Fk_BqBvM/export?format=csv"
     df = pd.read_csv(url)
+
+    # Debugging kolom (jika diperlukan)
+    # st.write("Kolom ditemukan:", df.columns.tolist())
+
     latest_row = df.iloc[-1]
-    return float(latest_row['MQ136']), float(latest_row['MQ137'])
+    return float(latest_row['MQ136 PPM']), float(latest_row['MQ137 PPM'])
 
 # === UI Utama ===
 st.markdown("<h1 style='color:#2c3e50;'>🔍 Pendeteksi Kualitas Daging</h1>", unsafe_allow_html=True)
