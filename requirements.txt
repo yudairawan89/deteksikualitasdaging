@@ -1,11 +1,25 @@
-streamlit
-torch
-torchvision
-ultralytics
-opencv-python-headless
-Pillow
-matplotlib
-requests
-gdown
-joblib
-scikit-learn
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# PyTorch CPU (stabil di Py 3.11)
+torch==2.2.2
+torchvision==0.17.2
+
+# Ultralytics yang cocok dengan kombinasi Torch + OpenCV ini
+ultralytics==8.2.103
+
+# OpenCV headless untuk server (tanpa GUI)
+opencv-python-headless==4.10.0.84
+
+# Scientific stack (versi yang klop dg Torch 2.2.x)
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.3.2
+joblib==1.3.2
+
+# Aplikasi & util
+streamlit==1.37.1
+Pillow==10.4.0
+matplotlib==3.8.4
+requests==2.32.3
+gdown==5.2.0
+
